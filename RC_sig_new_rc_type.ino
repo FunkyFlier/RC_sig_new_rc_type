@@ -226,12 +226,11 @@ void ProcessChannels(){
       break;
     case RUDD:
       if (rcData[i].reverse == 0){
-        RC_value[AILE] = (rcData[i].rcvd - rcData[i].mid) * rcData[i].scale + 1500;
+        RC_value[RUDD] = (rcData[i].rcvd - rcData[i].mid) * rcData[i].scale + 1500;
       }
       else{
-        RC_value[AILE] = (rcData[i].rcvd - rcData[i].mid) * rcData[i].scale - 1500;
+        RC_value[RUDD] = (rcData[i].rcvd - rcData[i].mid) * rcData[i].scale - 1500;
       }
-      RC_value[RUDD] = (rcData[i].rcvd - rcData[i].mid) * rcData[i].scale + 1500;
       break;
     case GEAR:
       if (rcData[i].reverse == 0){
