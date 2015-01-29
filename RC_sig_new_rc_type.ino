@@ -65,7 +65,6 @@ uint32_t printTimer;
 uint32_t generalPurposeTimer;
 uint32_t timeDiff;
 volatile boolean failSafe;
-volatile boolean dtd = false;
 uint8_t chanOrder[8] = {
   THRO,AILE,ELEV,RUDD,GEAR,AUX1,AUX2,AUX3
 };
@@ -92,7 +91,6 @@ void setup(){
   pinMode(YELLOW,OUTPUT);
   pinMode(GREEN,OUTPUT);
   Serial.begin(115200);
-  dtd = false;
   Serial<<"Start\r\n";
   RC_SS_Output();
 
@@ -177,8 +175,6 @@ void loop(){
   }    
   if (millis() - printTimer > 100){
     printTimer = millis();
-    //rcPointer[RUDD] = &rcData[3].val;
-    //FeedLine();
     Serial<<rcData[0].rcvd<<","<<rcData[1].rcvd<<","<<rcData[2].rcvd<<","<<rcData[3].rcvd<<","<<rcData[4].rcvd<<","<<rcData[5].rcvd<<","<<rcData[6].rcvd<<","<<rcData[7].rcvd<<"\r\n";
     Serial<<RC_value[THRO]<<","<<RC_value[AILE]<<","<<RC_value[ELEV]<<","<<RC_value[RUDD]<<","<<RC_value[GEAR]<<","<<RC_value[AUX1]<<","<<RC_value[AUX2]<<","<<RC_value[AUX3]<<","<<failSafe<<"\r\n";
   }
@@ -321,9 +317,6 @@ ISR(PCINT2_vect){
       }
       else{
         rcData[channelCount].rcvd = timeDifference;
-        /*if (rcData[channelCount].chan == THRO && dtd ==true){
-          Serial<<timeDifference<<","<<rcData[channelCount].min - 100<<"\r\n";
-        }*/
         if (rcData[channelCount].chan == THRO && ((timeDifference ) < (rcData[channelCount].min - 50) )){  
           failSafe = true;
         }
