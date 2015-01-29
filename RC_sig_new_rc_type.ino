@@ -103,16 +103,17 @@ void setup(){
   generalPurposeTimer = millis();
 
   GetMinMaxMid();
-  dtd = true;
   failSafe = false;
 }
 void AssignChannels(){
   for (uint8_t i = 0;i < 8; i++){
     rcData[i].chan = chanOrder[i];
-    /*if (rcData[i].chan == THRO){
-     rcData[i].reverse == 1;
-     }*/
-    rcData[i].reverse = 0;
+    if (rcData[i].chan == AILE || rcData[i].chan == THRO){
+      rcData[i].reverse = 1;
+    }
+    else{
+      rcData[i].reverse = 0;
+    }
   }
 
 }
@@ -202,7 +203,7 @@ void ProcessChannels(){
         RC_value[THRO] = (rcData[i].rcvd - rcData[i].min) * rcData[i].scale + 1000;
       }
       else{
-        RC_value[THRO] = (rcData[i].rcvd - rcData[i].min) * rcData[i].scale - 1000;
+        RC_value[THRO] = (rcData[i].rcvd - rcData[i].min) * - rcData[i].scale + 2000;
       }
       break;
     case AILE:
@@ -210,7 +211,7 @@ void ProcessChannels(){
         RC_value[AILE] = (rcData[i].rcvd - rcData[i].mid) * rcData[i].scale + 1500;
       }
       else{
-        RC_value[AILE] = (rcData[i].rcvd - rcData[i].mid) * rcData[i].scale - 1500;
+        RC_value[AILE] = (rcData[i].rcvd - rcData[i].mid) * - rcData[i].scale + 1500;
       }
       break;
     case ELEV:
@@ -218,7 +219,7 @@ void ProcessChannels(){
         RC_value[ELEV] = (rcData[i].rcvd - rcData[i].mid) * rcData[i].scale + 1500;
       }
       else{
-        RC_value[ELEV] = (rcData[i].rcvd - rcData[i].mid) * rcData[i].scale - 1500;
+        RC_value[ELEV] = (rcData[i].rcvd - rcData[i].mid) * - rcData[i].scale + 1500;
       }
 
       break;
@@ -227,7 +228,7 @@ void ProcessChannels(){
         RC_value[RUDD] = (rcData[i].rcvd - rcData[i].mid) * rcData[i].scale + 1500;
       }
       else{
-        RC_value[RUDD] = (rcData[i].rcvd - rcData[i].mid) * rcData[i].scale - 1500;
+        RC_value[RUDD] = (rcData[i].rcvd - rcData[i].mid) * - rcData[i].scale + 1500;
       }
       break;
     case GEAR:
@@ -235,7 +236,7 @@ void ProcessChannels(){
         RC_value[GEAR] = (rcData[i].rcvd - rcData[i].min) * rcData[i].scale + 1000;
       }
       else{
-        RC_value[GEAR] = (rcData[i].rcvd - rcData[i].min) * rcData[i].scale - 1000;
+        RC_value[GEAR] = (rcData[i].rcvd - rcData[i].min) * - rcData[i].scale + 2000;
       }
 
       break;
@@ -244,7 +245,7 @@ void ProcessChannels(){
         RC_value[AUX1] = (rcData[i].rcvd - rcData[i].min) * rcData[i].scale + 1000;
       }
       else{
-        RC_value[AUX1] = (rcData[i].rcvd - rcData[i].min) * rcData[i].scale - 1000;
+        RC_value[AUX1] = (rcData[i].rcvd - rcData[i].min) * - rcData[i].scale + 2000;
       }
 
       break;
@@ -253,7 +254,7 @@ void ProcessChannels(){
         RC_value[AUX2] = (rcData[i].rcvd - rcData[i].min) * rcData[i].scale + 1000;
       }
       else{
-        RC_value[AUX2] = (rcData[i].rcvd - rcData[i].min) * rcData[i].scale - 1000;
+        RC_value[AUX2] = (rcData[i].rcvd - rcData[i].min) * - rcData[i].scale + 2000;
       }
 
       break;
@@ -262,7 +263,7 @@ void ProcessChannels(){
         RC_value[AUX3] = (rcData[i].rcvd - rcData[i].min) * rcData[i].scale + 1000;      
       }
       else{
-        RC_value[AUX3] = (rcData[i].rcvd - rcData[i].min) * rcData[i].scale - 1000;      
+        RC_value[AUX3] = (rcData[i].rcvd - rcData[i].min) * - rcData[i].scale + 2000;    
       }
 
       break;
@@ -555,6 +556,7 @@ void Spektrum(){
   rcType = DSMX;
   detected = true;
 }
+
 
 
 
