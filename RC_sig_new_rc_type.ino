@@ -65,7 +65,7 @@ uint32_t printTimer;
 uint32_t generalPurposeTimer;
 uint32_t timeDiff;
 volatile boolean failSafe;
-
+volatile boolean dtd = false;
 uint8_t chanOrder[8] = {
   THRO,AILE,ELEV,RUDD,GEAR,AUX1,AUX2,AUX3
 };
@@ -92,6 +92,7 @@ void setup(){
   pinMode(YELLOW,OUTPUT);
   pinMode(GREEN,OUTPUT);
   Serial.begin(115200);
+  dtd = false;
   Serial<<"Start\r\n";
   RC_SS_Output();
 
@@ -104,14 +105,15 @@ void setup(){
   generalPurposeTimer = millis();
 
   GetMinMaxMid();
-
+  dtd = true;
+  failSafe = false;
 }
 void AssignChannels(){
   for (uint8_t i = 0;i < 8; i++){
     rcData[i].chan = chanOrder[i];
     /*if (rcData[i].chan == THRO){
-      rcData[i].reverse == 1;
-    }*/
+     rcData[i].reverse == 1;
+     }*/
     rcData[i].reverse = 0;
   }
 
@@ -291,8 +293,8 @@ ISR(PCINT2_vect){
           timeDifference = currentTime - changeTime[i];//if so then calculate the pulse width
           if (900 < timeDifference && timeDifference < 2200){//check to see if it is a valid length
             rcData[i].rcvd = timeDifference;
-            if (rcData[i].chan == THRO && ((timeDifference ) < 1025)){
-            //if (rcData[i].chan == THRO && ((timeDifference ) < (rcData[i].min - 50) )){  
+            //if (rcData[i].chan == THRO && ((timeDifference ) < 1025)){
+            if (rcData[i].chan == THRO && ((timeDifference ) < (rcData[i].min - 50) )){  
               failSafe = true;
             }
             else{
@@ -318,8 +320,17 @@ ISR(PCINT2_vect){
         channelCount = 0;
       }
       else{
-        rcData[channelCount++].rcvd = timeDifference;
-        newRC = true;
+        rcData[channelCount].rcvd = timeDifference;
+        /*if (rcData[channelCount].chan == THRO && dtd ==true){
+          Serial<<timeDifference<<","<<rcData[channelCount].min - 100<<"\r\n";
+        }*/
+        if (rcData[channelCount].chan == THRO && ((timeDifference ) < (rcData[channelCount].min - 50) )){  
+          failSafe = true;
+        }
+        else{
+          newRC = true;
+        }
+        channelCount++;
       }
     }
     break;
@@ -551,6 +562,8 @@ void Spektrum(){
   rcType = DSMX;
   detected = true;
 }
+
+
 
 
 
