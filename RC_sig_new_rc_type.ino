@@ -3,12 +3,15 @@
 #define YELLOW 40
 #define GREEN 42
 
-#define PAUSE 5
+#define PAUSE 22
 #define RC_SS 44
 
 #define RC_SS_Output() DDRH |= 1<<7 
 #define RC_SSHigh() PORTH |= 1<<7 
 #define RC_SSLow() PORTH &= ~(1<<7)
+
+enum ISR_States {
+  STAND,PPM};
 
 enum RC_Types {
   DSMX = 1, SBUS, RC};
@@ -34,11 +37,14 @@ uint8_t currentPinState = 0;
 uint8_t previousPinState = 0;
 uint8_t changeMask = 0;
 uint8_t lastPinState = 0;
-uint16_t currentTime = 0;
-uint16_t timeDifference = 0;
-uint16_t changeTime[8];
+uint32_t currentTime = 0;
+uint32_t previousTime = 0;
+uint32_t timeDifference = 0;
+uint32_t changeTime[8];
 uint8_t sBusData[25];
 
+uint8_t ISRState = STAND;
+uint8_t channelCount = 0;
 
 
 typedef struct{
@@ -61,20 +67,20 @@ uint32_t timeDiff;
 volatile boolean failSafe;
 
 uint8_t chanOrder[8] = {
- THRO,AILE,ELEV,RUDD,GEAR,AUX1,AUX2,AUX3
- };
+  THRO,AILE,ELEV,RUDD,GEAR,AUX1,AUX2,AUX3
+};
 /*uint8_t chanOrder[8] = {
  ELEV,RUDD,THRO,AILE,GEAR,AUX1,AUX2,AUX3
  };*/
 /*uint8_t chanOrder[8] = {
-  AUX3,AUX2,AUX1,GEAR,RUDD,ELEV,AILE,THRO
-};*/
+ AUX3,AUX2,AUX1,GEAR,RUDD,ELEV,AILE,THRO
+ };*/
 
 
 void pause(){
   while(digitalRead(PAUSE)==0){
   }//wait for the toggle
-  delay(500);
+  delay(1500);
 }
 
 
@@ -90,24 +96,25 @@ void setup(){
   RC_SS_Output();
 
   DetectRC();
+  Serial<<rcType<<","<<ISRState<<"\r\n";
+  pause(); 
   AssignChannels();
   _200HzISRConfig();
   printTimer = millis();
   generalPurposeTimer = millis();
 
   GetMinMaxMid();
-  //AssignPointer();
 
 }
 void AssignChannels(){
   for (uint8_t i = 0;i < 8; i++){
     rcData[i].chan = chanOrder[i];
-    if (rcData[i].chan == THRO){
+    /*if (rcData[i].chan == THRO){
       rcData[i].reverse == 1;
-    }
+    }*/
     rcData[i].reverse = 0;
   }
-  
+
 }
 
 
@@ -118,8 +125,10 @@ void GetMinMaxMid(){
     if (newRC == true){
       newRC = false;
       Serial<<"Mid: "<<rcData[0].rcvd<<","<<rcData[1].rcvd<<","<<rcData[2].rcvd<<","<<rcData[3].rcvd<<","<<rcData[4].rcvd<<","<<rcData[5].rcvd<<","<<rcData[6].rcvd<<","<<rcData[7].rcvd<<"\r\n";
+
     }     
   }
+
   digitalWrite(RED,LOW);
   for (uint8_t i = THRO; i <= AUX3; i++){
     rcData[i].mid = rcData[i].rcvd ;
@@ -169,7 +178,7 @@ void loop(){
     //rcPointer[RUDD] = &rcData[3].val;
     //FeedLine();
     Serial<<rcData[0].rcvd<<","<<rcData[1].rcvd<<","<<rcData[2].rcvd<<","<<rcData[3].rcvd<<","<<rcData[4].rcvd<<","<<rcData[5].rcvd<<","<<rcData[6].rcvd<<","<<rcData[7].rcvd<<"\r\n";
-    Serial<<RC_value[THRO]<<","<<RC_value[AILE]<<","<<RC_value[ELEV]<<","<<RC_value[RUDD]<<","<<RC_value[GEAR]<<","<<RC_value[AUX1]<<","<<RC_value[AUX2]<<","<<RC_value[AUX3]<<"\r\n";
+    Serial<<RC_value[THRO]<<","<<RC_value[AILE]<<","<<RC_value[ELEV]<<","<<RC_value[RUDD]<<","<<RC_value[GEAR]<<","<<RC_value[AUX1]<<","<<RC_value[AUX2]<<","<<RC_value[AUX3]<<","<<failSafe<<"\r\n";
   }
 
 }
@@ -271,30 +280,52 @@ void ProcessChannels(){
 
 
 ISR(PCINT2_vect){
-  currentPinState = PINK;
-  changeMask = currentPinState ^ lastPinState;
-  lastPinState = currentPinState;
-  currentTime = micros();
-  for(uint8_t i=0;i<8;i++){
-    if(changeMask & 1<<i){//has there been a change
-      if(!(currentPinState & 1<<i)){//is the pin in question logic low?
-        timeDifference = currentTime - changeTime[i];//if so then calculate the pulse width
-        if (900 < timeDifference && timeDifference < 2200){//check to see if it is a valid length
-          rcData[i].rcvd = timeDifference;
-          if (rcData[i].chan == THRO && ((timeDifference ) < 1025)){
-            failSafe = true;
-          }
-          else{
-            newRC = true;
-          }
+  switch(ISRState){
+  case STAND:
+    currentPinState = PINK;
+    changeMask = currentPinState ^ lastPinState;
+    lastPinState = currentPinState;
+    currentTime = micros();
+    for(uint8_t i=0;i<8;i++){
+      if(changeMask & 1<<i){//has there been a change
+        if(!(currentPinState & 1<<i)){//is the pin in question logic low?
+          timeDifference = currentTime - changeTime[i];//if so then calculate the pulse width
+          if (900 < timeDifference && timeDifference < 2200){//check to see if it is a valid length
+            rcData[i].rcvd = timeDifference;
+            if (rcData[i].chan == THRO && ((timeDifference ) < 1025)){
+            //if (rcData[i].chan == THRO && ((timeDifference ) < (rcData[i].min - 50) )){  
+              failSafe = true;
+            }
+            else{
+              newRC = true;
+            }
 
+          }
+        }
+        else{//the pin is logic high implying that this is the start of the pulse
+          changeTime[i] = currentTime;
         }
       }
-      else{//the pin is logic high implying that this is the start of the pulse
-        changeTime[i] = currentTime;
+    }
+    break;
+  case PPM:
+    currentTime = micros();
+    if ((PINK & 0x80) == 0x80){//is the PPM pin high
+      previousTime = currentTime;
+    }
+    else{
+      timeDifference = currentTime - previousTime;
+      if(timeDifference > 2500){
+        channelCount = 0;
+      }
+      else{
+        rcData[channelCount++].rcvd = timeDifference;
+        newRC = true;
       }
     }
+    break;
   }
+
 }
 
 void FeedLine(){
@@ -414,13 +445,20 @@ void DetectRC(){
     rcType = RC;
   }
   readState = 0;
-  if (rcType == RC){
+  if (rcType == RC){//figure out the best way to handle this redundant code 
     DDRK = 0;//PORTK as input
     PORTK |= 0xFF;//turn on pull ups
     PCMSK2 |= 0xFF;//set interrupt mask for all of PORTK
     PCICR = 1<<2;//enable the pin change interrupt for K
     delay(100);//wait for a few frames
-  } 
+    if (rcData[0].rcvd == 0 && rcData[1].rcvd == 0 && rcData[2].rcvd == 0 && rcData[3].rcvd == 0 && rcData[4].rcvd == 0 && rcData[5].rcvd == 0 && rcData[6].rcvd == 0){
+      ISRState = PPM;
+      PORTK |= 0x80;
+      PCMSK2 |= 0x80;
+    }
+
+  }
+
 
 
 }
@@ -446,6 +484,13 @@ void FrameCheck(){//checks if serial RC was incorrectly detected
       PCMSK2 |= 0xFF;//set interrupt mask for all of PORTK
       PCICR = 1<<2;
       delay(100);//wait for a few frames
+      if (rcData[0].rcvd == 0 && rcData[1].rcvd == 0 && rcData[2].rcvd == 0 && rcData[3].rcvd == 0 && rcData[4].rcvd == 0 && rcData[5].rcvd == 0 && rcData[6].rcvd == 0){
+        ISRState = PPM;
+        PORTK |= 0x80;
+        PCMSK2 |= 0x80;
+      }
+      Serial<<"*** "<<rcType<<","<<ISRState<<"\r\n";
+      pause();
       generalPurposeTimer = millis();
     }
   } 
@@ -507,6 +552,19 @@ void Spektrum(){
   rcType = DSMX;
   detected = true;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
