@@ -3,7 +3,7 @@
 #define YELLOW 40
 #define GREEN 42
 
-#define PAUSE 22
+#define PAUSE 5
 #define RC_SS 44
 
 #define RC_SS_Output() DDRH |= 1<<7 
@@ -74,6 +74,7 @@ uint8_t chanOrder[8] = {
 /*uint8_t chanOrder[8] = {
  AUX3,AUX2,AUX1,GEAR,RUDD,ELEV,AILE,THRO
  };*/
+ 
 
 
 void pause(){
