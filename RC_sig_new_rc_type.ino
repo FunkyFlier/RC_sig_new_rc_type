@@ -65,6 +65,7 @@ uint32_t printTimer;
 uint32_t generalPurposeTimer;
 uint32_t timeDiff;
 volatile boolean failSafe;
+volatile uint8_t failSafeCount;
 uint8_t chanOrder[8] = {
   THRO,AILE,ELEV,RUDD,GEAR,AUX1,AUX2,AUX3
 };
@@ -105,6 +106,7 @@ void setup(){
 
   GetMinMaxMid();
   failSafe = false;
+  failSafeCount = 0;
 }
 void AssignChannels(){
   for (uint8_t i = 0;i < 8; i++){
@@ -174,11 +176,15 @@ void loop(){
   if (newRC == true){
     newRC = false;
     ProcessChannels();
+    failSafeCount = 0;
   }    
   if (millis() - printTimer > 100){
     printTimer = millis();
     Serial<<rcData[0].rcvd<<","<<rcData[1].rcvd<<","<<rcData[2].rcvd<<","<<rcData[3].rcvd<<","<<rcData[4].rcvd<<","<<rcData[5].rcvd<<","<<rcData[6].rcvd<<","<<rcData[7].rcvd<<"\r\n";
     Serial<<RC_value[THRO]<<","<<RC_value[AILE]<<","<<RC_value[ELEV]<<","<<RC_value[RUDD]<<","<<RC_value[GEAR]<<","<<RC_value[AUX1]<<","<<RC_value[AUX2]<<","<<RC_value[AUX3]<<","<<failSafe<<"\r\n";
+  }
+  if (failSafeCount == 200){
+    failSafe = true;
   }
 
 }
@@ -190,6 +196,7 @@ void _200HzISRConfig(){
 }
 
 ISR(TIMER5_COMPA_vect, ISR_NOBLOCK){
+  failSafeCount++;
   if (rcType != RC){
     FeedLine();
   }
