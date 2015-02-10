@@ -75,7 +75,7 @@ uint8_t chanOrder[8] = {
 /*uint8_t chanOrder[8] = {
  AUX3,AUX2,AUX1,GEAR,RUDD,ELEV,AILE,THRO
  };*/
- 
+
 
 
 void pause(){
@@ -111,7 +111,7 @@ void setup(){
 void AssignChannels(){
   for (uint8_t i = 0;i < 8; i++){
     rcData[i].chan = chanOrder[i];
-    if (rcData[i].chan == AILE || rcData[i].chan == THRO){
+    if (rcData[i].chan == AILE || rcData[i].chan == RUDD){
       rcData[i].reverse = 1;
     }
     else{
@@ -142,7 +142,6 @@ void GetMinMaxMid(){
     rcData[i].min = 1500;
   }
   Serial<<"Center vals: "<<rcData[0].mid<<","<<rcData[1].mid<<","<<rcData[2].mid<<","<<rcData[3].mid<<"\r\n";
-  delay(500);
   pause();
   while(digitalRead(PAUSE)==0){
     if (newRC == true){
@@ -160,14 +159,11 @@ void GetMinMaxMid(){
   }
   Serial<<"Max values: "<<rcData[0].max<<","<<rcData[1].max<<","<<rcData[2].max<<","<<rcData[3].max<<","<<rcData[4].max<<","<<rcData[5].max<<","<<rcData[6].max<<","<<rcData[7].max<<"\r\n";
   Serial<<"Min values: "<<rcData[0].min<<","<<rcData[1].min<<","<<rcData[2].min<<","<<rcData[3].min<<","<<rcData[4].min<<","<<rcData[5].min<<","<<rcData[6].min<<","<<rcData[7].min<<"\r\n";
-  delay(500);
-  pause();
   for (uint8_t i = THRO; i <= AUX3; i++){   
     rcData[i].scale = 1000.0/( (float)rcData[i].max - (float)rcData[i].min );
   }
 
   Serial<<"Scale values: "<<rcData[0].scale<<","<<rcData[1].scale<<","<<rcData[2].scale<<","<<rcData[3].scale<<","<<rcData[4].scale<<","<<rcData[5].scale<<","<<rcData[6].scale<<","<<rcData[7].scale<<"\r\n";
-  delay(500);
   pause();
 
 }
@@ -298,7 +294,6 @@ ISR(PCINT2_vect){
           timeDifference = currentTime - changeTime[i];//if so then calculate the pulse width
           if (900 < timeDifference && timeDifference < 2200){//check to see if it is a valid length
             rcData[i].rcvd = timeDifference;
-            //if (rcData[i].chan == THRO && ((timeDifference ) < 1025)){
             if (rcData[i].chan == THRO && ((timeDifference ) < (rcData[i].min - 50) )){  
               failSafe = true;
             }
@@ -401,7 +396,13 @@ void SBusParser(){
 }
 
 void DSMXParser(){
-
+  if (Serial.available() > 14){
+    while(Serial.available() > 14){
+      Serial.read();
+    }
+    byteCount = 0;
+    bufferIndex = 0;
+  }
   while (Serial1.available() > 0){
     if (millis() - frameTime > 8){
       byteCount = 0;
@@ -424,11 +425,12 @@ void DSMXParser(){
       newRC = true;
       byteCount = 0;
       bufferIndex = 0;
-      for (int i = 0; i < 14; i=i+2){
+      for (uint8_t i = 0; i < 14; i=i+2){
         channelNumber = (spekBuffer[i] >> 3) & 0x0F;
-        rcData[channelNumber].rcvd = ((spekBuffer[i] << 8) | (spekBuffer[i+1])) & 0x07FF;
+        if (channelNumber < 8){
+          rcData[channelNumber].rcvd = ((spekBuffer[i] << 8) | (spekBuffer[i+1])) & 0x07FF;
+        }
       }
-      byteCount = 0;
     }
   }
 }
@@ -564,6 +566,9 @@ void Spektrum(){
   rcType = DSMX;
   detected = true;
 }
+
+
+
 
 
 
