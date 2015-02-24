@@ -1,4 +1,5 @@
 #include <Streaming.h>
+#include <EEPROM.h>
 #define RED 38
 #define YELLOW 40
 #define GREEN 42
@@ -9,6 +10,13 @@
 #define RC_SS_Output() DDRH |= 1<<7 
 #define RC_SSHigh() PORTH |= 1<<7 
 #define RC_SSLow() PORTH &= ~(1<<7)
+
+enum CalibrationFlags {
+  RC_FLAG,
+  ACC_FLAG,
+  MAG_FLAG,
+  GAINS_FLAG
+};
 
 enum ISR_States {
   STAND,PPM};
@@ -69,6 +77,23 @@ volatile uint8_t failSafeCount;
 uint8_t chanOrder[8] = {
   THRO,AILE,ELEV,RUDD,GEAR,AUX1,AUX2,AUX3
 };
+
+
+typedef union{
+  float val;
+  uint8_t buffer[4];
+}
+float_u;
+
+typedef union{
+  int16_t val;
+  uint8_t buffer[2];
+}
+int16_u;
+float_u outFloat;
+int16_u outInt16;
+
+uint8_t calibrationFlags;
 /*uint8_t chanOrder[8] = {
  ELEV,RUDD,THRO,AILE,GEAR,AUX1,AUX2,AUX3
  };*/
@@ -87,7 +112,7 @@ void pause(){
 
 
 void setup(){
-
+  //ResetROMFlag();
   pinMode(PAUSE,INPUT);
   pinMode(RED,OUTPUT);
   pinMode(YELLOW,OUTPUT);
@@ -99,29 +124,111 @@ void setup(){
   DetectRC();
   Serial<<rcType<<","<<ISRState<<"\r\n";
   pause(); 
-  AssignChannels();
+
   _200HzISRConfig();
   printTimer = millis();
   generalPurposeTimer = millis();
-
-  GetMinMaxMid();
+  calibrationFlags = EEPROM.read(0);
+  if(  ((calibrationFlags & (1<<RC_FLAG)) >> RC_FLAG) == 0x01 ){
+    Serial<<"calibration\r\n";
+    pause();
+    AssignChannels();
+    GetMinMaxMid();
+    WriteROM();
+  }
+  ReadROM();
   failSafe = false;
   failSafeCount = 0;
+}
+
+void ResetROMFlag(){
+  calibrationFlags = EEPROM.read(0x00);
+  calibrationFlags |= 1<<RC_FLAG;
+  EEPROM.write(0x00,calibrationFlags);
 }
 void AssignChannels(){
   for (uint8_t i = 0;i < 8; i++){
     rcData[i].chan = chanOrder[i];
-    if (rcData[i].chan == AILE || rcData[i].chan == RUDD){
-      rcData[i].reverse = 1;
-    }
-    else{
-      rcData[i].reverse = 0;
-    }
+    /*if (rcData[i].chan == AILE || rcData[i].chan == RUDD){
+     rcData[i].reverse = 0;
+     }
+     else{
+     rcData[i].reverse = 0;
+     }*/
   }
 
 }
+void ReadROM(){
+  uint16_t j=0;//index for input buffers
+  uint16_t k=0;//index for start of each channel's data in rom
+  uint16_t l=0;//index for each channel
+  uint16_t switchControl;
+  for(uint16_t i = 332; i <=427; i++){//index for each rom location
+    switchControl = i - k;
+    if (switchControl < 338){//first 16 bit ints
+      outInt16.buffer[j++] = EEPROM.read(i);
+    }
+    if (switchControl > 338 && i - k < 343){//scale factor
+      outFloat.buffer[j++] = EEPROM.read(i);
+    }
+    
+    switch (switchControl){
+    case 333://max
+      rcData[l].max = outInt16.val;
+      j=0;
+      break;
+    case 335://min
+      rcData[l].min = outInt16.val;
+      j=0;
+      break;
+    case 337://mid
+    rcData[l].mid = outInt16.val;
+      j=0;
+      break;
+    case 338://chan
+      rcData[l].chan = EEPROM.read(i);
+      break;
+    case 342://scale
+      rcData[l].scale = outFloat.val;
+      j=0;
+      break;
+    case 343://reverse
+      rcData[l].reverse = EEPROM.read(i);
+      k += 12;
+      l += 1;
+      break;
+    }
+  }
+}
+void WriteROM(){
+  uint16_t ROMIndex = 332;
+  for(uint8_t i = 0; i < 8; i++){
+    outInt16.val = rcData[i].max;
+    EEPROM.write(ROMIndex++,outInt16.buffer[0]);
+    EEPROM.write(ROMIndex++,outInt16.buffer[1]);
 
+    outInt16.val = rcData[i].min;
+    EEPROM.write(ROMIndex++,outInt16.buffer[0]);
+    EEPROM.write(ROMIndex++,outInt16.buffer[1]);
 
+    outInt16.val = rcData[i].mid;
+    EEPROM.write(ROMIndex++,outInt16.buffer[0]);
+    EEPROM.write(ROMIndex++,outInt16.buffer[1]);
+
+    EEPROM.write(ROMIndex++,rcData[i].chan);
+
+    outFloat.val = rcData[i].scale;
+    EEPROM.write(ROMIndex++,outFloat.buffer[0]);
+    EEPROM.write(ROMIndex++,outFloat.buffer[1]);
+    EEPROM.write(ROMIndex++,outFloat.buffer[2]);
+    EEPROM.write(ROMIndex++,outFloat.buffer[3]);
+
+    EEPROM.write(ROMIndex++,rcData[i].reverse);
+  }
+  calibrationFlags = EEPROM.read(0x00);
+  calibrationFlags &= ~(1<<RC_FLAG);
+  EEPROM.write(0x00,calibrationFlags);
+}
 void GetMinMaxMid(){
   while(digitalRead(PAUSE)==0){//center
     digitalWrite(RED,HIGH);
@@ -566,6 +673,10 @@ void Spektrum(){
   rcType = DSMX;
   detected = true;
 }
+
+
+
+
 
 
 
