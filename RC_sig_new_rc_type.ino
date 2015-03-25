@@ -11,6 +11,9 @@
 #define RC_SSHigh() PORTH |= 1<<7 
 #define RC_SSLow() PORTH &= ~(1<<7)
 
+#define CAL_FLAGS 0
+
+
 enum CalibrationFlags {
   RC_FLAG,
   ACC_FLAG,
@@ -113,6 +116,7 @@ void pause(){
 
 void setup(){
   //ResetROMFlag();
+  //while(1){}
   pinMode(PAUSE,INPUT);
   pinMode(RED,OUTPUT);
   pinMode(YELLOW,OUTPUT);
@@ -132,6 +136,7 @@ void setup(){
   if(  ((calibrationFlags & (1<<RC_FLAG)) >> RC_FLAG) == 0x01 ){
     Serial<<"calibration\r\n";
     pause();
+    Serial<<"*r\n";
     AssignChannels();
     GetMinMaxMid();
     WriteROM();
@@ -145,6 +150,13 @@ void ResetROMFlag(){
   calibrationFlags = EEPROM.read(0x00);
   calibrationFlags |= 1<<RC_FLAG;
   EEPROM.write(0x00,calibrationFlags);
+  for(int i=0; i < 400; i++){
+    EEPROM.write(i,0xFF);
+  }
+  
+  /*calibrationFlags = EEPROM.read(CAL_FLAGS);
+    calibrationFlags |= (1<<GAINS_FLAG);
+    EEPROM.write(CAL_FLAGS,calibrationFlags);*/
 }
 void AssignChannels(){
   for (uint8_t i = 0;i < 8; i++){
@@ -487,9 +499,9 @@ void SBusParser(){
           rcData[5].rcvd = (sBusData[7]>>7|sBusData[8]<<1|sBusData[9]<<9) & 0x07FF;
           rcData[6].rcvd = (sBusData[9]>>2|sBusData[10]<<6) & 0x07FF;
           rcData[7].rcvd = (sBusData[10]>>5|sBusData[11]<<3) & 0x07FF;
-          if (sBusData[23] & (1<<2)) {
+          /*if (sBusData[23] & (1<<2)) {
             failSafe = true;
-          }
+          }*/
           if (sBusData[23] & (1<<3)) {
             failSafe = true;
           }
