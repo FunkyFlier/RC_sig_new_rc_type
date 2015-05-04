@@ -25,14 +25,14 @@ enum ISR_States {
   STAND,PPM};
 
 enum RC_Types {
-  DSMX = 1, SBUS, RC};
+  DSM10, DSM11, SBUS, RC};
 enum RC_Chan {
   THRO, AILE, ELEV, RUDD, GEAR, AUX1, AUX2, AUX3};
 //RC related vars
 uint8_t readState,inByte,byteCount,channelNumber;
 volatile uint8_t rcType;
 uint32_t frameTime;
-boolean detected = false;
+boolean rcDetected = false;
 volatile boolean newRC = false;
 boolean frameStart = true;
 boolean frameValid = false;
@@ -107,14 +107,23 @@ uint8_t calibrationFlags;
 
 
 void pause(){
+  Serial<<"pause\r\n";
   while(digitalRead(PAUSE)==0){
   }//wait for the toggle
+  Serial<<"***\r\n";
   delay(1500);
 }
 
 
-
+void WipeRom(){
+  for(uint16_t i = 0; i < 600; i++){
+    EEPROM.write(i,0xFF);
+  }
+  while(1){
+  }
+}
 void setup(){
+  //WipeRom();
   //ResetROMFlag();
   //while(1){}
   pinMode(PAUSE,INPUT);
@@ -126,17 +135,19 @@ void setup(){
   RC_SS_Output();
 
   DetectRC();
-  Serial<<rcType<<","<<ISRState<<"\r\n";
+  //DSMDebug();
+  Serial<<rcDetected<<","<<rcType<<","<<ISRState<<"\r\n";
   pause(); 
 
   _200HzISRConfig();
   printTimer = millis();
   generalPurposeTimer = millis();
   calibrationFlags = EEPROM.read(0);
-  if(  ((calibrationFlags & (1<<RC_FLAG)) >> RC_FLAG) == 0x01 ){
+  //if(  ((calibrationFlags & (1<<RC_FLAG)) >> RC_FLAG) == 0x01 ){
+  if(1){
     Serial<<"calibration\r\n";
     pause();
-    Serial<<"*r\n";
+    //Serial<<"*r\n";
     AssignChannels();
     GetMinMaxMid();
     WriteROM();
@@ -153,10 +164,10 @@ void ResetROMFlag(){
   for(int i=0; i < 400; i++){
     EEPROM.write(i,0xFF);
   }
-  
+
   /*calibrationFlags = EEPROM.read(CAL_FLAGS);
-    calibrationFlags |= (1<<GAINS_FLAG);
-    EEPROM.write(CAL_FLAGS,calibrationFlags);*/
+   calibrationFlags |= (1<<GAINS_FLAG);
+   EEPROM.write(CAL_FLAGS,calibrationFlags);*/
 }
 void AssignChannels(){
   for (uint8_t i = 0;i < 8; i++){
@@ -183,7 +194,7 @@ void ReadROM(){
     if (switchControl > 338 && i - k < 343){//scale factor
       outFloat.buffer[j++] = EEPROM.read(i);
     }
-    
+
     switch (switchControl){
     case 333://max
       rcData[l].max = outInt16.val;
@@ -194,7 +205,7 @@ void ReadROM(){
       j=0;
       break;
     case 337://mid
-    rcData[l].mid = outInt16.val;
+      rcData[l].mid = outInt16.val;
       j=0;
       break;
     case 338://chan
@@ -257,8 +268,8 @@ void GetMinMaxMid(){
     rcData[i].mid = rcData[i].rcvd ;
   }
   for (uint8_t i = THRO; i <= AUX3; i++){
-    rcData[i].max = 1500;
-    rcData[i].min = 1500;
+    rcData[i].max =  rcData[i].mid;
+    rcData[i].min =  rcData[i].mid;
   }
   Serial<<"Center vals: "<<rcData[0].mid<<","<<rcData[1].mid<<","<<rcData[2].mid<<","<<rcData[3].mid<<"\r\n";
   pause();
@@ -279,7 +290,9 @@ void GetMinMaxMid(){
   Serial<<"Max values: "<<rcData[0].max<<","<<rcData[1].max<<","<<rcData[2].max<<","<<rcData[3].max<<","<<rcData[4].max<<","<<rcData[5].max<<","<<rcData[6].max<<","<<rcData[7].max<<"\r\n";
   Serial<<"Min values: "<<rcData[0].min<<","<<rcData[1].min<<","<<rcData[2].min<<","<<rcData[3].min<<","<<rcData[4].min<<","<<rcData[5].min<<","<<rcData[6].min<<","<<rcData[7].min<<"\r\n";
   for (uint8_t i = THRO; i <= AUX3; i++){   
-    rcData[i].scale = 1000.0/( (float)rcData[i].max - (float)rcData[i].min );
+    if ((float)rcData[i].max - (float)rcData[i].min != 0){
+      rcData[i].scale = 1000.0/( (float)rcData[i].max - (float)rcData[i].min );
+    }
   }
 
   Serial<<"Scale values: "<<rcData[0].scale<<","<<rcData[1].scale<<","<<rcData[2].scale<<","<<rcData[3].scale<<","<<rcData[4].scale<<","<<rcData[5].scale<<","<<rcData[6].scale<<","<<rcData[7].scale<<"\r\n";
@@ -416,10 +429,7 @@ ISR(PCINT2_vect){
             if (rcData[i].chan == THRO && ((timeDifference ) < (rcData[i].min - 50) )){  
               failSafe = true;
             }
-            else{
-              newRC = true;
-            }
-
+            newRC = true;
           }
         }
         else{//the pin is logic high implying that this is the start of the pulse
@@ -443,9 +453,7 @@ ISR(PCINT2_vect){
         if (rcData[channelCount].chan == THRO && ((timeDifference ) < (rcData[channelCount].min - 50) )){  
           failSafe = true;
         }
-        else{
-          newRC = true;
-        }
+        newRC = true;
         channelCount++;
       }
     }
@@ -457,8 +465,9 @@ ISR(PCINT2_vect){
 void FeedLine(){
 
   switch(rcType){
+  case 0:
   case 1:
-    DSMXParser();
+    DSMParser();
     break;
   case 2:
     SBusParser();
@@ -500,8 +509,8 @@ void SBusParser(){
           rcData[6].rcvd = (sBusData[9]>>2|sBusData[10]<<6) & 0x07FF;
           rcData[7].rcvd = (sBusData[10]>>5|sBusData[11]<<3) & 0x07FF;
           /*if (sBusData[23] & (1<<2)) {
-            failSafe = true;
-          }*/
+           failSafe = true;
+           }*/
           if (sBusData[23] & (1<<3)) {
             failSafe = true;
           }
@@ -513,21 +522,127 @@ void SBusParser(){
 
 
 }
+//uint8_t channelsByte;
+//boolean fullRes = false;
 
-void DSMXParser(){
-  if (Serial.available() > 14){
-    while(Serial.available() > 14){
-      Serial.read();
+void DSMDetectRes(){
+  rcType = DSM11;
+  uint8_t channel1,channel2;
+  boolean lowRes = false,fullRes= false;
+  for(uint8_t i = 0; i < 2 ; i++){//make sure frame one starts with 1 then 5
+    while(GetDSMFrame() == false){
     }
-    byteCount = 0;
-    bufferIndex = 0;
+    //check for second byte flag
+    if (~(spekBuffer[0] & 1 << 0x80)){
+      channel1 = spekBuffer[0] >> 2 & 0x0F;
+      channel2 = spekBuffer[2] >> 2 & 0x0F;
+      if (channel1 == 1 && channel2 == 5){
+        lowRes = true;
+      }
+      channel1 = spekBuffer[0] >> 3 & 0x0F;
+      channel2 = spekBuffer[2] >> 3 & 0x0F;
+      if (channel1 == 1 && channel2 == 5){
+        fullRes = true;
+      }
+    }
   }
+  if (lowRes == true & fullRes == false){
+    rcType = DSM10;
+    rcDetected = true;
+    return;
+  }
+
+  if (lowRes == false & fullRes == true){
+    rcType = DSM11;
+    rcDetected = true;
+    return;
+  }
+  rcDetected = false;
+  /*for(uint8_t i = 0; i < 2 ; i++){//check for repeated channels
+   while(GetDSMFrame() == false){
+   }
+   channelsByte = 0;
+   for (uint8_t i = 0; i < 14; i=i+2){
+   channelNumber = (spekBuffer[i] >> 3) & 0x0F;
+   if(channelsByte & 1 << channelNumber){
+   rcType = DSM10;
+   }
+   channelsByte |= 1 << channelNumber;
+   }
+   
+   }*/
+
+
+
+
+}
+/*void DSMDebug(){
+ while(1){
+ DSMParser();
+ if (newRC == true){
+ newRC = false;
+ Serial<<"Chan byte: "<<_HEX(channelsByte)<<"\r\n";
+ }
+ 
+ }
+ }*/
+
+boolean GetDSMFrame(){
+
+  while (Serial1.available() > 0){
+
+    if (millis() - frameTime > 8){
+      byteCount = 0;
+      bufferIndex = 0;
+      //channelsByte = 0;
+    }
+
+    inByte = Serial1.read();
+    frameTime = millis();
+    byteCount++;
+
+    if (bufferIndex > 14){
+      bufferIndex = 0;
+      byteCount = 0;
+      //channelsByte = 0;
+    }
+
+    if (byteCount > 2){
+      spekBuffer[bufferIndex] = inByte;
+      bufferIndex++;
+    }
+
+    if (byteCount == 16 && bufferIndex == 14){
+      //newRC = true;
+      return true;
+      byteCount = 0;
+      bufferIndex = 0;
+
+    }
+
+  }
+
+  return false;
+
+
+}
+
+void DSMParser(){
+  /*if (Serial.available() > 14){
+   while(Serial.available() > 14){
+   Serial.read();
+   }
+   byteCount = 0;
+   bufferIndex = 0;
+   }*/
   while (Serial1.available() > 0){
     if (millis() - frameTime > 8){
       byteCount = 0;
       bufferIndex = 0;
+      //channelsByte = 0;
     }
     inByte = Serial1.read();
+    //Serial<<"x"<<_HEX(inByte)<<"\r\n";
     frameTime = millis();
     byteCount++;
 
@@ -535,6 +650,7 @@ void DSMXParser(){
     if (bufferIndex > 14){
       bufferIndex = 0;
       byteCount = 0;
+      //channelsByte = 0;
     }
     if (byteCount > 2){
       spekBuffer[bufferIndex] = inByte;
@@ -545,97 +661,101 @@ void DSMXParser(){
       byteCount = 0;
       bufferIndex = 0;
       for (uint8_t i = 0; i < 14; i=i+2){
-        channelNumber = (spekBuffer[i] >> 3) & 0x0F;
-        if (channelNumber < 8){
-          rcData[channelNumber].rcvd = ((spekBuffer[i] << 8) | (spekBuffer[i+1])) & 0x07FF;
+
+        if (rcType == DSM10){
+          channelNumber = (spekBuffer[i] >> 2) & 0x0F;
+          if (channelNumber < 8){
+            rcData[channelNumber].rcvd = ((spekBuffer[i] << 8) | (spekBuffer[i+1])) & 0x03FF;
+          }
         }
+        else{
+          channelNumber = (spekBuffer[i] >> 3) & 0x0F;
+          if (channelNumber < 8){
+            rcData[channelNumber].rcvd = ((spekBuffer[i] << 8) | (spekBuffer[i+1])) & 0x07FF;
+          }
+        }
+
+        //Serial<<channelNumber<<"\r\n";
+
+
+
+        /*channelNumber = (spekBuffer[i] >> 2) & 0x0F;
+         
+         //Serial<<channelNumber<<"\r\n";
+         if (channelNumber < 8){
+         channelsByte |= 1 << channelNumber;
+         rcData[channelNumber].rcvd = ((spekBuffer[i] << 8) | (spekBuffer[i+1])) & 0x03FF;
+         }*/
       }
+      //Serial<<"\r\n";
     }
   }
+  //Serial<<"\r\n";
 }
 
 void DetectRC(){
   readState = 0;
   RC_SSHigh();
   SBus();
-  readState = 0;
-  if (detected == true){
-    FrameCheck();
+  Serial<<"a\r\n";
+  if(rcDetected == true){
     readState = 0;
     return;
   }
-  readState = 0;
   RC_SSLow();
   Spektrum();
-  readState = 0;
-
-  if (detected == true){
-    FrameCheck();
+  Serial<<"b\r\n";
+  if (rcDetected == true){
     readState = 0;
     return;
   }
-  else{
-    rcType = RC;
-  }
-  readState = 0;
-  if (rcType == RC){//figure out the best way to handle this redundant code 
-    DDRK = 0;//PORTK as input
-    PORTK |= 0xFF;//turn on pull ups
-    PCMSK2 |= 0xFF;//set interrupt mask for all of PORTK
-    PCICR = 1<<2;//enable the pin change interrupt for K
-    delay(100);//wait for a few frames
-    if (rcData[0].rcvd == 0 && rcData[1].rcvd == 0 && rcData[2].rcvd == 0 && rcData[3].rcvd == 0 && rcData[4].rcvd == 0 && rcData[5].rcvd == 0 && rcData[6].rcvd == 0){
-      ISRState = PPM;
-      PORTK |= 0x80;
-      PCMSK2 |= 0x80;
-    }
+  Serial<<"c\r\n";
+  PWMPPMCheck();
 
-  }
 
 
 
 }
 
 
-void FrameCheck(){//checks if serial RC was incorrectly detected
+void PWMPPMCheck(){//checks if serial RC was incorrectly detected
   newRC = false;
   uint32_t frameCheckTimer;
-  frameCheckTimer =  millis();
-  delay(100);
-  while (newRC == false){
-    if (rcType == RC){
-      delay(100);
-    }
-    if (rcType != RC){
-      FeedLine();
-    }
 
-    if (millis() - frameCheckTimer > 1000){//in case it has incorrectly detected serial RC
-      rcType = RC;
-      DDRK = 0;//PORTK as input
-      PORTK |= 0xFF;//turn on pull ups
-      PCMSK2 |= 0xFF;//set interrupt mask for all of PORTK
-      PCICR = 1<<2;
-      delay(100);//wait for a few frames
-      if (rcData[0].rcvd == 0 && rcData[1].rcvd == 0 && rcData[2].rcvd == 0 && rcData[3].rcvd == 0 && rcData[4].rcvd == 0 && rcData[5].rcvd == 0 && rcData[6].rcvd == 0){
-        ISRState = PPM;
-        PORTK |= 0x80;
-        PCMSK2 |= 0x80;
-      }
-      Serial<<"*** "<<rcType<<","<<ISRState<<"\r\n";
-      pause();
-      generalPurposeTimer = millis();
-    }
-  } 
+  ISRState = STAND;
+  rcType = RC;
+  DDRK = 0;//PORTK as input
+  PORTK |= 0xFF;//turn on pull ups
+  PCMSK2 |= 0xFF;//set interrupt mask for all of PORTK
+  PCICR = 1 << 2;
+  delay(100);//wait for a few frames
+  if (rcData[0].rcvd == 0 && rcData[1].rcvd == 0 && rcData[2].rcvd == 0 && rcData[3].rcvd == 0 && rcData[4].rcvd == 0 && rcData[5].rcvd == 0 && rcData[6].rcvd == 0 && rcData[7].rcvd != 0) {
+    ISRState = PPM;
+    PORTK |= 0x80;
+    PCMSK2 |= 0x80;
+  }
   newRC = false;
+  frameCheckTimer =  millis();
+  while (newRC == false) {
+    if (millis() - frameCheckTimer > 1000) { //in case it has incorrectly detected serial RC
+      rcDetected = false;
+      return;
+
+    }
+  }
+  rcDetected = true;
+  newRC = false;
+
 
 }
 
 void SBus(){
-
+  rcDetected = false;
   Serial1.begin(100000);
   generalPurposeTimer = millis();
-
+  while(Serial1.available() > 0){
+    Serial1.read();
+  }
   while (Serial1.available() == 0){
     if (millis() - generalPurposeTimer > 1000){
       return;
@@ -661,7 +781,7 @@ void SBus(){
         readState = 0;
         if (sBusData[0]==0x0f && sBusData[24] == 0x00){
           rcType = SBUS;
-          detected = true;
+          rcDetected = true;
         }
       }
       break;
@@ -670,21 +790,44 @@ void SBus(){
   frameTime = millis();
 }
 void Spektrum(){
+  Serial<<"a\r\n";
   Serial1.begin(115200);
+  while(Serial1.available() > 0){
+    Serial1.read();
+  }
+  Serial<<"b\r\n";
   generalPurposeTimer = millis();
   while (Serial1.available() == 0){
     if (millis() - generalPurposeTimer > 1000){
       return;
     }
   }  
-  delay(5);
-  while(Serial1.available() > 0){
-    Serial1.read();
+  delay(23);
+  Serial<<"c\r\n";
+  DSMParser();
+  Serial<<"d\r\n";
+  if (newRC == true){
+    Serial<<"e\r\n";
+    DSMDetectRes();
+    newRC = false;
+    frameTime = millis();
   }
-  frameTime = millis();
-  rcType = DSMX;
-  detected = true;
+
+
+  //rcType = DSM11;
+
 }
+
+
+
+
+
+
+
+
+
+
+
 
 
 
