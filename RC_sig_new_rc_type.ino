@@ -514,7 +514,7 @@ void DSMDetectRes(){
   uint8_t channel1,channel2;
   boolean lowRes = false,fullRes= false;
   for(uint8_t i = 0; i < 2 ; i++){//make sure frame one starts with 1 then 5
-    while(GetDSMFrame() == false){
+    while(DSMParser() == false){
     }
     //check for second byte flag
     if (~(DSMSerialBuffer[0] & 1 << 0x80)){
@@ -549,45 +549,9 @@ void DSMDetectRes(){
 }
 
 
-boolean GetDSMFrame(){
 
-  while (Serial1.available() > 0){
-
-    if (millis() - frameTime > 8){
-      byteCount = 0;
-      bufferIndex = 0;
-    }
-
-    inByte = Serial1.read();
-    frameTime = millis();
-    byteCount++;
-
-    if (bufferIndex > 14){
-      bufferIndex = 0;
-      byteCount = 0;
-    }
-
-    if (byteCount > 2){
-      DSMSerialBuffer[bufferIndex] = inByte;
-      bufferIndex++;
-    }
-
-    if (byteCount == 16 && bufferIndex == 14){
-      return true;
-      byteCount = 0;
-      bufferIndex = 0;
-
-    }
-
-  }
-
-  return false;
-
-
-}
-
-void DSMParser(){
-
+boolean DSMParser(){
+  boolean validFrame = false;
   while (Serial1.available() > 0){
     if (millis() - frameTime > 8){
       byteCount = 0;
@@ -611,7 +575,7 @@ void DSMParser(){
       byteCount = 0;
       bufferIndex = 0;
       for (uint8_t i = 0; i < 14; i=i+2){
-
+        validFrame = true;
         if (rcType == DSM10){
           channelNumber = (DSMSerialBuffer[i] >> 2) & 0x0F;
           if (channelNumber < 8){
@@ -628,6 +592,7 @@ void DSMParser(){
       }
     }
   }
+  return validFrame;
 }
 
 void DetectRC(){
