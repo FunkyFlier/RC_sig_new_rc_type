@@ -113,7 +113,7 @@ void FeedLine(){
 
 }
 void SBusParser(){
-  
+
   while( RCSerialAvailable() > 0){
     if (millis() - frameTime > 8){
       readState = 0;
@@ -306,7 +306,7 @@ void SBus(){
   RCSerialBegin(100000,SERIAL_8E2);
   waitTimer = millis();
   while( RCSerialAvailable() > 0){
-     RCSerialRead();
+    RCSerialRead();
   }
   while ( RCSerialAvailable() == 0){
     if (millis() - waitTimer > 1000){
@@ -315,36 +315,19 @@ void SBus(){
   }
 
   delay(20);
-  while( RCSerialAvailable() > 0){
-    inByte =  RCSerialRead();
-    switch (readState){
-    case 0:
-      if (inByte == 0x0f){
-        bufferIndex = 0;
-        sBusData[bufferIndex] = inByte;
-        sBusData[24] = 0xff;
-        readState = 1;
-      }
-      break;
-    case 1:
-      bufferIndex ++;
-      sBusData[bufferIndex] = inByte;
-      if (bufferIndex == 24){
-        readState = 0;
-        if (sBusData[0]==0x0f && sBusData[24] == 0x00){
-          rcType = SBUS;
-          rcDetected = true;
-        }
-      }
-      break;
-    }
+  SBusParser();
+  if(newRC == true){
+    newRC = false;
+    rcType = SBUS;
+    rcDetected = true;
+    frameTime = millis();
   }
-  frameTime = millis();
+
 }
 void DSMSerial(){
   RCSerialBegin(115200);
   while( RCSerialAvailable() > 0){
-     RCSerialRead();
+    RCSerialRead();
   }
   waitTimer = millis();
   while ( RCSerialAvailable() == 0){
@@ -363,4 +346,5 @@ void DSMSerial(){
 
 
 }
+
 
