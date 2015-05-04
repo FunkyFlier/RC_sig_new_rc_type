@@ -3,6 +3,8 @@
 
 #include "Types.h"
 #include "Definitions.h"
+#include "Comm.h"
+#include "Arduino.h"
 
 typedef struct {
   int16_t max;

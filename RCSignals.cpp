@@ -1,5 +1,5 @@
 #include "RCSignals.h"
-#include "Comm.h"
+
 //RC related vars
 
 RC_t rcData[8];
@@ -8,6 +8,8 @@ volatile uint8_t rcType;
 uint8_t ISRState = STAND;
 volatile boolean RCFailSafe = false;
 volatile boolean newRC = false;
+
+uint8_t sBusData[25];
 
 uint8_t readState,inByte,byteCount,channelNumber;
 //volatile uint8_t rcType;
@@ -30,13 +32,12 @@ uint32_t currentTime = 0;
 uint32_t previousTime = 0;
 uint32_t timeDifference = 0;
 uint32_t changeTime[8];
-uint8_t sBusData[25];
 
-//uint8_t ISRState = STAND;
+
+
 uint8_t channelCount = 0;
 
 uint32_t timeDiff,waitTimer;
-//volatile boolean RCFailSafe;
 
 
 
@@ -112,6 +113,7 @@ void FeedLine(){
 
 }
 void SBusParser(){
+  
   while( RCSerialAvailable() > 0){
     if (millis() - frameTime > 8){
       readState = 0;
@@ -301,7 +303,7 @@ void PWMPPMCheck(){//checks if serial RC was incorrectly detected
 
 void SBus(){
   rcDetected = false;
-  Serial1.begin(100000);
+  RCSerialBegin(100000,SERIAL_8E2);
   waitTimer = millis();
   while( RCSerialAvailable() > 0){
      RCSerialRead();
@@ -340,7 +342,7 @@ void SBus(){
   frameTime = millis();
 }
 void DSMSerial(){
-  Serial1.begin(115200);
+  RCSerialBegin(115200);
   while( RCSerialAvailable() > 0){
      RCSerialRead();
   }
