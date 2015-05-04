@@ -124,8 +124,6 @@ void WipeRom(){
 }
 void setup(){
   //WipeRom();
-  //ResetROMFlag();
-  //while(1){}
   pinMode(PAUSE,INPUT);
   pinMode(RED,OUTPUT);
   pinMode(YELLOW,OUTPUT);
@@ -135,7 +133,6 @@ void setup(){
   RC_SS_Output();
 
   DetectRC();
-  //DSMDebug();
   Serial<<rcDetected<<","<<rcType<<","<<ISRState<<"\r\n";
   pause(); 
 
@@ -143,11 +140,9 @@ void setup(){
   printTimer = millis();
   generalPurposeTimer = millis();
   calibrationFlags = EEPROM.read(0);
-  //if(  ((calibrationFlags & (1<<RC_FLAG)) >> RC_FLAG) == 0x01 ){
-  if(1){
+  if(  ((calibrationFlags & (1<<RC_FLAG)) >> RC_FLAG) == 0x01 ){
     Serial<<"calibration\r\n";
     pause();
-    //Serial<<"*r\n";
     AssignChannels();
     GetMinMaxMid();
     WriteROM();
@@ -157,18 +152,7 @@ void setup(){
   failSafeCount = 0;
 }
 
-void ResetROMFlag(){
-  calibrationFlags = EEPROM.read(0x00);
-  calibrationFlags |= 1<<RC_FLAG;
-  EEPROM.write(0x00,calibrationFlags);
-  for(int i=0; i < 400; i++){
-    EEPROM.write(i,0xFF);
-  }
 
-  /*calibrationFlags = EEPROM.read(CAL_FLAGS);
-   calibrationFlags |= (1<<GAINS_FLAG);
-   EEPROM.write(CAL_FLAGS,calibrationFlags);*/
-}
 void AssignChannels(){
   for (uint8_t i = 0;i < 8; i++){
     rcData[i].chan = chanOrder[i];
@@ -508,7 +492,7 @@ void SBusParser(){
           rcData[5].rcvd = (sBusData[7]>>7|sBusData[8]<<1|sBusData[9]<<9) & 0x07FF;
           rcData[6].rcvd = (sBusData[9]>>2|sBusData[10]<<6) & 0x07FF;
           rcData[7].rcvd = (sBusData[10]>>5|sBusData[11]<<3) & 0x07FF;
-          /*if (sBusData[23] & (1<<2)) {
+          /*if (sBusData[23] & (1<<2)) {//frame loss flag
            failSafe = true;
            }*/
           if (sBusData[23] & (1<<3)) {
@@ -522,8 +506,7 @@ void SBusParser(){
 
 
 }
-//uint8_t channelsByte;
-//boolean fullRes = false;
+
 
 void DSMDetectRes(){
   rcType = DSM11;
@@ -558,34 +541,12 @@ void DSMDetectRes(){
     return;
   }
   rcDetected = false;
-  /*for(uint8_t i = 0; i < 2 ; i++){//check for repeated channels
-   while(GetDSMFrame() == false){
-   }
-   channelsByte = 0;
-   for (uint8_t i = 0; i < 14; i=i+2){
-   channelNumber = (spekBuffer[i] >> 3) & 0x0F;
-   if(channelsByte & 1 << channelNumber){
-   rcType = DSM10;
-   }
-   channelsByte |= 1 << channelNumber;
-   }
-   
-   }*/
 
 
 
 
 }
-/*void DSMDebug(){
- while(1){
- DSMParser();
- if (newRC == true){
- newRC = false;
- Serial<<"Chan byte: "<<_HEX(channelsByte)<<"\r\n";
- }
- 
- }
- }*/
+
 
 boolean GetDSMFrame(){
 
@@ -594,7 +555,6 @@ boolean GetDSMFrame(){
     if (millis() - frameTime > 8){
       byteCount = 0;
       bufferIndex = 0;
-      //channelsByte = 0;
     }
 
     inByte = Serial1.read();
@@ -604,7 +564,6 @@ boolean GetDSMFrame(){
     if (bufferIndex > 14){
       bufferIndex = 0;
       byteCount = 0;
-      //channelsByte = 0;
     }
 
     if (byteCount > 2){
@@ -613,7 +572,6 @@ boolean GetDSMFrame(){
     }
 
     if (byteCount == 16 && bufferIndex == 14){
-      //newRC = true;
       return true;
       byteCount = 0;
       bufferIndex = 0;
@@ -628,21 +586,13 @@ boolean GetDSMFrame(){
 }
 
 void DSMParser(){
-  /*if (Serial.available() > 14){
-   while(Serial.available() > 14){
-   Serial.read();
-   }
-   byteCount = 0;
-   bufferIndex = 0;
-   }*/
+
   while (Serial1.available() > 0){
     if (millis() - frameTime > 8){
       byteCount = 0;
       bufferIndex = 0;
-      //channelsByte = 0;
     }
     inByte = Serial1.read();
-    //Serial<<"x"<<_HEX(inByte)<<"\r\n";
     frameTime = millis();
     byteCount++;
 
@@ -650,7 +600,6 @@ void DSMParser(){
     if (bufferIndex > 14){
       bufferIndex = 0;
       byteCount = 0;
-      //channelsByte = 0;
     }
     if (byteCount > 2){
       spekBuffer[bufferIndex] = inByte;
@@ -675,41 +624,25 @@ void DSMParser(){
           }
         }
 
-        //Serial<<channelNumber<<"\r\n";
-
-
-
-        /*channelNumber = (spekBuffer[i] >> 2) & 0x0F;
-         
-         //Serial<<channelNumber<<"\r\n";
-         if (channelNumber < 8){
-         channelsByte |= 1 << channelNumber;
-         rcData[channelNumber].rcvd = ((spekBuffer[i] << 8) | (spekBuffer[i+1])) & 0x03FF;
-         }*/
       }
-      //Serial<<"\r\n";
     }
   }
-  //Serial<<"\r\n";
 }
 
 void DetectRC(){
   readState = 0;
   RC_SSHigh();
   SBus();
-  Serial<<"a\r\n";
   if(rcDetected == true){
     readState = 0;
     return;
   }
   RC_SSLow();
   Spektrum();
-  Serial<<"b\r\n";
   if (rcDetected == true){
     readState = 0;
     return;
   }
-  Serial<<"c\r\n";
   PWMPPMCheck();
 
 
@@ -790,12 +723,10 @@ void SBus(){
   frameTime = millis();
 }
 void Spektrum(){
-  Serial<<"a\r\n";
   Serial1.begin(115200);
   while(Serial1.available() > 0){
     Serial1.read();
   }
-  Serial<<"b\r\n";
   generalPurposeTimer = millis();
   while (Serial1.available() == 0){
     if (millis() - generalPurposeTimer > 1000){
@@ -803,18 +734,14 @@ void Spektrum(){
     }
   }  
   delay(23);
-  Serial<<"c\r\n";
   DSMParser();
-  Serial<<"d\r\n";
   if (newRC == true){
-    Serial<<"e\r\n";
     DSMDetectRes();
     newRC = false;
     frameTime = millis();
   }
 
 
-  //rcType = DSM11;
 
 }
 
