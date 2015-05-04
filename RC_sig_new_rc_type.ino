@@ -37,7 +37,7 @@ volatile boolean newRC = false;
 boolean frameStart = true;
 boolean frameValid = false;
 
-uint8_t spekBuffer[14];
+uint8_t DSMSerialBuffer[14];
 
 uint16_t bufferIndex=0;
 
@@ -140,7 +140,8 @@ void setup(){
   printTimer = millis();
   generalPurposeTimer = millis();
   calibrationFlags = EEPROM.read(0);
-  if(  ((calibrationFlags & (1<<RC_FLAG)) >> RC_FLAG) == 0x01 ){
+  //if(  ((calibrationFlags & (1<<RC_FLAG)) >> RC_FLAG) == 0x01 ){
+    if(1){
     Serial<<"calibration\r\n";
     pause();
     AssignChannels();
@@ -516,14 +517,14 @@ void DSMDetectRes(){
     while(GetDSMFrame() == false){
     }
     //check for second byte flag
-    if (~(spekBuffer[0] & 1 << 0x80)){
-      channel1 = spekBuffer[0] >> 2 & 0x0F;
-      channel2 = spekBuffer[2] >> 2 & 0x0F;
+    if (~(DSMSerialBuffer[0] & 1 << 0x80)){
+      channel1 = DSMSerialBuffer[0] >> 2 & 0x0F;
+      channel2 = DSMSerialBuffer[2] >> 2 & 0x0F;
       if (channel1 == 1 && channel2 == 5){
         lowRes = true;
       }
-      channel1 = spekBuffer[0] >> 3 & 0x0F;
-      channel2 = spekBuffer[2] >> 3 & 0x0F;
+      channel1 = DSMSerialBuffer[0] >> 3 & 0x0F;
+      channel2 = DSMSerialBuffer[2] >> 3 & 0x0F;
       if (channel1 == 1 && channel2 == 5){
         fullRes = true;
       }
@@ -567,7 +568,7 @@ boolean GetDSMFrame(){
     }
 
     if (byteCount > 2){
-      spekBuffer[bufferIndex] = inByte;
+      DSMSerialBuffer[bufferIndex] = inByte;
       bufferIndex++;
     }
 
@@ -602,7 +603,7 @@ void DSMParser(){
       byteCount = 0;
     }
     if (byteCount > 2){
-      spekBuffer[bufferIndex] = inByte;
+      DSMSerialBuffer[bufferIndex] = inByte;
       bufferIndex++;
     }
     if (byteCount == 16 && bufferIndex == 14){
@@ -612,15 +613,15 @@ void DSMParser(){
       for (uint8_t i = 0; i < 14; i=i+2){
 
         if (rcType == DSM10){
-          channelNumber = (spekBuffer[i] >> 2) & 0x0F;
+          channelNumber = (DSMSerialBuffer[i] >> 2) & 0x0F;
           if (channelNumber < 8){
-            rcData[channelNumber].rcvd = ((spekBuffer[i] << 8) | (spekBuffer[i+1])) & 0x03FF;
+            rcData[channelNumber].rcvd = ((DSMSerialBuffer[i] << 8) | (DSMSerialBuffer[i+1])) & 0x03FF;
           }
         }
         else{
-          channelNumber = (spekBuffer[i] >> 3) & 0x0F;
+          channelNumber = (DSMSerialBuffer[i] >> 3) & 0x0F;
           if (channelNumber < 8){
-            rcData[channelNumber].rcvd = ((spekBuffer[i] << 8) | (spekBuffer[i+1])) & 0x07FF;
+            rcData[channelNumber].rcvd = ((DSMSerialBuffer[i] << 8) | (DSMSerialBuffer[i+1])) & 0x07FF;
           }
         }
 
@@ -638,7 +639,7 @@ void DetectRC(){
     return;
   }
   RC_SSLow();
-  Spektrum();
+  DSMSerial();
   if (rcDetected == true){
     readState = 0;
     return;
@@ -722,7 +723,7 @@ void SBus(){
   }
   frameTime = millis();
 }
-void Spektrum(){
+void DSMSerial(){
   Serial1.begin(115200);
   while(Serial1.available() > 0){
     Serial1.read();
