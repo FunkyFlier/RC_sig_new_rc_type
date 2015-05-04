@@ -1,7 +1,5 @@
 #include "RCSignals.h"
 
-//RC related vars
-
 RC_t rcData[8];
 boolean rcDetected = false;
 volatile uint8_t rcType;
@@ -9,20 +7,13 @@ uint8_t ISRState = STAND;
 volatile boolean RCFailSafe = false;
 volatile boolean newRC = false;
 
-uint8_t sBusData[25];
-
 uint8_t readState,inByte,byteCount,channelNumber;
-//volatile uint8_t rcType;
 uint32_t frameTime;
-//boolean rcDetected = false;
-//volatile boolean newRC = false;
 
 uint8_t DSMSerialBuffer[14];
+uint8_t sBusData[25];
 
 uint16_t bufferIndex=0;
-
-
-
 
 uint8_t currentPinState = 0;
 uint8_t previousPinState = 0;
@@ -33,18 +24,13 @@ uint32_t previousTime = 0;
 uint32_t timeDifference = 0;
 uint32_t changeTime[8];
 
-
-
 uint8_t channelCount = 0;
 
 uint32_t timeDiff,waitTimer;
 
-
-
 boolean DSMParser();
 void DSMDetectRes();
 void SBusParser();
-
 void PWMPPMCheck();
 void SBus();
 void DSMSerial();

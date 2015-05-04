@@ -33,6 +33,17 @@ enum RC_Types {
   DSM10, DSM11, SBUS, RC};
 enum RC_Chan {
   THRO, AILE, ELEV, RUDD, GEAR, AUX1, AUX2, AUX3};
-  
-  
+
+#define RC_DATA_START 332
+#define RC_DATA_END 427
+
+#define MAX_INDEX 333
+#define MIN_INDEX 335
+#define MID_INDEX 337
+#define CHAN_INDEX 338
+#define SCALE_INDEX 342
+#define REV_INDEX 343
+
+
 #endif//#ifndef Definitions.h
+

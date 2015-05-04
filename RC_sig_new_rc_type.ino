@@ -100,36 +100,36 @@ void ReadROM(){
   uint16_t k=0;//index for start of each channel's data in rom
   uint16_t l=0;//index for each channel
   uint16_t switchControl;
-  for(uint16_t i = 332; i <=427; i++){//index for each rom location
+  for(uint16_t i = RC_DATA_START; i <=RC_DATA_END; i++){//index for each rom location
     switchControl = i - k;
-    if (switchControl < 338){//first 16 bit ints
+    if (switchControl < CHAN_INDEX){//first 16 bit ints
       outInt16.buffer[j++] = EEPROM.read(i);
     }
-    if (switchControl > 338 && i - k < 343){//scale factor
+    if (switchControl > CHAN_INDEX && i - k < REV_INDEX){//scale factor
       outFloat.buffer[j++] = EEPROM.read(i);
     }
 
     switch (switchControl){
-    case 333://max
+    case MAX_INDEX://max
       rcData[l].max = outInt16.val;
       j=0;
       break;
-    case 335://min
+    case MIN_INDEX://min
       rcData[l].min = outInt16.val;
       j=0;
       break;
-    case 337://mid
+    case MID_INDEX://mid
       rcData[l].mid = outInt16.val;
       j=0;
       break;
-    case 338://chan
+    case CHAN_INDEX://chan
       rcData[l].chan = EEPROM.read(i);
       break;
-    case 342://scale
+    case SCALE_INDEX://scale
       rcData[l].scale = outFloat.val;
       j=0;
       break;
-    case 343://reverse
+    case REV_INDEX://reverse
       rcData[l].reverse = EEPROM.read(i);
       k += 12;
       l += 1;
@@ -138,7 +138,7 @@ void ReadROM(){
   }
 }
 void WriteROM(){
-  uint16_t ROMIndex = 332;
+  uint16_t ROMIndex = RC_DATA_START;
   for(uint8_t i = 0; i < 8; i++){
     outInt16.val = rcData[i].max;
     EEPROM.write(ROMIndex++,outInt16.buffer[0]);
