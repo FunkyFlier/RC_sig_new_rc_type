@@ -1,4 +1,5 @@
 #include "RCSignals.h"
+#include <Streaming.h>
 
 RC_t rcData[8];
 boolean rcDetected = false;
@@ -152,11 +153,13 @@ void DSMDetectRes(){
   rcType = DSM11;
   uint8_t channel1,channel2;
   boolean lowRes = false,fullRes= false;
+
   for(uint8_t i = 0; i < 2 ; i++){//make sure frame one starts with 1 then 5
     while(DSMParser() == false){
     }
     //check for second byte flag
-    if (~(DSMSerialBuffer[0] & 1 << 0x80)){
+
+    if ( (DSMSerialBuffer[0] & 0x80) != 0x80){
       channel1 = DSMSerialBuffer[0] >> 2 & 0x0F;
       channel2 = DSMSerialBuffer[2] >> 2 & 0x0F;
       if (channel1 == 1 && channel2 == 5){
@@ -189,50 +192,7 @@ void DSMDetectRes(){
 
 
 
-boolean DSMParser(){
-  boolean validFrame = false;
-  while ( RCSerialAvailable() > 0){
-    if (millis() - frameTime > 8){
-      byteCount = 0;
-      bufferIndex = 0;
-    }
-    inByte =  RCSerialRead();
-    frameTime = millis();
-    byteCount++;
 
-
-    if (bufferIndex > 14){
-      bufferIndex = 0;
-      byteCount = 0;
-    }
-    if (byteCount > 2){
-      DSMSerialBuffer[bufferIndex] = inByte;
-      bufferIndex++;
-    }
-    if (byteCount == 16 && bufferIndex == 14){
-      newRC = true;
-      byteCount = 0;
-      bufferIndex = 0;
-      for (uint8_t i = 0; i < 14; i=i+2){
-        validFrame = true;
-        if (rcType == DSM10){
-          channelNumber = (DSMSerialBuffer[i] >> 2) & 0x0F;
-          if (channelNumber < 8){
-            rcData[channelNumber].rcvd = ((DSMSerialBuffer[i] << 8) | (DSMSerialBuffer[i+1])) & 0x03FF;
-          }
-        }
-        else{
-          channelNumber = (DSMSerialBuffer[i] >> 3) & 0x0F;
-          if (channelNumber < 8){
-            rcData[channelNumber].rcvd = ((DSMSerialBuffer[i] << 8) | (DSMSerialBuffer[i+1])) & 0x07FF;
-          }
-        }
-
-      }
-    }
-  }
-  return validFrame;
-}
 
 void DetectRC(){
   readState = 0;
@@ -310,19 +270,74 @@ void SBus(){
   }
 
 }
+
+boolean DSMParser(){
+  boolean validFrame = false;
+  while (RCSerialAvailable() >16){
+    RCSerialRead();
+  }
+  if (RCSerialAvailable() == 16){
+    byteCount = 0;
+    bufferIndex = 0;
+    while ( RCSerialAvailable() > 0){
+
+
+      inByte =  RCSerialRead();
+      frameTime = millis();
+      byteCount++;
+
+      if (byteCount > 2){
+        DSMSerialBuffer[bufferIndex] = inByte;
+        bufferIndex++;
+      }
+
+      if (byteCount == 16 && bufferIndex == 14){
+        newRC = true;
+        byteCount = 0;
+        bufferIndex = 0;
+        validFrame = true;
+        for (uint8_t i = 0; i < 14; i=i+2){
+          if (rcType == DSM10){
+            channelNumber = (DSMSerialBuffer[i] >> 2) & 0x0F;
+            if (channelNumber < 8){
+              rcData[channelNumber].rcvd = ((DSMSerialBuffer[i] << 8) | (DSMSerialBuffer[i+1])) & 0x03FF;
+            }
+          }
+          else{
+            channelNumber = (DSMSerialBuffer[i] >> 3) & 0x0F;
+            if (channelNumber < 8){
+              rcData[channelNumber].rcvd = ((DSMSerialBuffer[i] << 8) | (DSMSerialBuffer[i+1])) & 0x07FF;
+            }
+          }
+
+        }
+     
+
+      }
+    }
+  }
+  return validFrame;
+}
+
+
 void DSMSerial(){
-  RCSerialBegin(115200);
+  RCSerialBegin(115200,SERIAL_8N1);
+  delay(23);
   while( RCSerialAvailable() > 0){
     RCSerialRead();
   }
+
   waitTimer = millis();
-  while ( RCSerialAvailable() == 0){
-    if (millis() - waitTimer > 1000){
+
+  frameTime = millis();
+  bufferIndex = 0;
+  byteCount = 0;
+  waitTimer = millis();
+  while(DSMParser() == false){
+    if (millis() - waitTimer > 100){
       return;
     }
-  }  
-  delay(23);
-  DSMParser();
+  }
   if (newRC == true){
     DSMDetectRes();
     newRC = false;
@@ -332,5 +347,15 @@ void DSMSerial(){
 
 
 }
+
+
+
+
+
+
+
+
+
+
 
 

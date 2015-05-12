@@ -60,7 +60,7 @@ void setup(){
   Serial.begin(115200);
   Serial<<"Start\r\n";
   RC_SS_Output();
-
+  
   DetectRC();
   Serial<<rcDetected<<","<<rcType<<","<<ISRState<<"\r\n";
   pause(); 
