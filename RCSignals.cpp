@@ -169,13 +169,13 @@ void DSMDetectRes(){
       }
     }
   }
-  if (lowRes == true & fullRes == false){
+  if (lowRes == true && fullRes == false){
     rcType = DSM10;
     rcDetected = true;
     return;
   }
 
-  if (lowRes == false & fullRes == true){
+  if (lowRes == false && fullRes == true){
     rcType = DSM11;
     rcDetected = true;
     return;

@@ -1,5 +1,5 @@
-#ifndef Definitions.h
-#define Definitions.h
+#ifndef Definitions_h
+#define Definitions_h
 
 #define GREEN 42
 #define YELLOW 40
